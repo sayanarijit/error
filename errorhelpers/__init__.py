@@ -1,12 +1,12 @@
 """Helpers for handling Python errors."""
 
-__version__ = "0.1.0"  # Also update pyproject.toml
+__version__ = "0.1.1"  # Also update pyproject.toml
+__all__ = ["UnexpectedError", "expect_errors"]
 
 from functools import wraps
-from typing import Callable, TypeVar, Union, Sequence, Dict
-from typing_extensions import Protocol
+from typing import Callable, Dict, Sequence, TypeVar, Union
 
-__all__ = ["UnexpectedError", "expect_errors"]
+from typing_extensions import Protocol
 
 ExceptionType = TypeVar("ExceptionType", bound=BaseException)
 FuncArgs = TypeVar("FuncArgs")
@@ -49,17 +49,17 @@ def expect_errors(
 
         >>> import pytest
         >>> import errorhelpers
-        >>> 
+        >>>
         >>> @errorhelpers.expect_errors(ZeroDivisionError)
         ... def sensitive_transaction(x, y):
         ...     return int(x) / int(y)
-        ... 
+        ...
         >>> assert sensitive_transaction(4, "2") == 2
-        >>> 
+        >>>
         >>> # `ZeroDivisionError` will be re-raised.
         >>> with pytest.raises(ZeroDivisionError):
         ...     sensitive_transaction(4, 0)
-        ... 
+        ...
         >>> # In case of other exceptions, `errorhelpers.UnexpectedError("Unexpected error")`
         >>> # will be raised instead.
         >>> with pytest.raises(errorhelpers.UnexpectedError, match="Unexpected error"):
@@ -69,19 +69,19 @@ def expect_errors(
 
         >>> import pytest
         >>> import errorhelpers
-        >>> 
+        >>>
         >>> @errorhelpers.expect_errors(
         ...     ZeroDivisionError, on_unexpected_error=lambda err_, args_, kwargs_: -1
         ... )
         ... def sensitive_transaction(x, y):
         ...     return int(x) / int(y)
-        ... 
+        ...
         >>> assert sensitive_transaction(4, "2") == 2
-        >>> 
+        >>>
         >>> # `ZeroDivisionError` will be re-raised.
         >>> with pytest.raises(ZeroDivisionError):
         ...     sensitive_transaction(4, 0)
-        ... 
+        ...
         >>> # In case of other exceptions, -1 will be returned.
         >>> assert sensitive_transaction("a", "b") == -1
 
@@ -89,32 +89,32 @@ def expect_errors(
 
         >>> import pytest
         >>> import errorhelpers
-        >>> 
+        >>>
         >>> class CustomError(Exception):
         ...     @classmethod
         ...     def raise_(cls, msg):
         ...         def raiser(error, args, kwargs):
         ...             print("Hiding error:", error, "with args:", args, "and kwargs: ", kwargs)
         ...             raise cls(msg)
-        ... 
+        ...
         ...         return raiser
-        ... 
+        ...
         >>> @errorhelpers.expect_errors(
         ...     ZeroDivisionError, on_unexpected_error=CustomError.raise_("Custom error")
         ... )
         ... def sensitive_transaction(x, y):
         ...     return int(x) / int(y)
-        >>> 
+        >>>
         >>> assert sensitive_transaction(4, "2") == 2
-        >>> 
+        >>>
         >>> # `ZeroDivisionError` will be re-raised.
         >>> with pytest.raises(ZeroDivisionError):
         ...     sensitive_transaction(4, 0)
-        ... 
+        ...
         >>> # In case of other exceptions, `CustomError` will be raised instead.
         >>> with pytest.raises(CustomError, match="Custom error"):
         ...     sensitive_transaction("a", "b")
-        ... 
+        ...
         Hiding error: invalid literal for int() with base 10: 'a' with args: ('a', 'b') and kwargs:  {}
     """
 
