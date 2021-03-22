@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "errorhelpers"
+version = "0.1.0"  # Also update __init__.py
+description = "Helpers for handling Python errors"
+license = "MIT"
+keywords = ["error", "helpers"]
+homepage = "https://github.com/sayanarijit/errorhelpers"
+authors = ["Arijit Basu <sayanarijit@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+typing-extensions = "^3.7.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+pytest-cov = "^2.10.1"
+pytest-mypy = "^0.8.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
