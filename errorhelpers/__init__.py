@@ -1,8 +1,9 @@
 """Helpers for handling Python errors."""
 
-__version__ = "0.1.1"  # Also update pyproject.toml
+__version__ = "0.2.0"  # Also update pyproject.toml
 __all__ = ["UnexpectedError", "expect_errors"]
 
+from contextlib import contextmanager
 from functools import wraps
 from typing import Callable, Dict, Sequence, TypeVar, Union
 
@@ -12,7 +13,6 @@ ExceptionType = TypeVar("ExceptionType", bound=BaseException)
 FuncArgs = TypeVar("FuncArgs")
 FuncKwArgs = TypeVar("FuncKwArgs")
 FuncReturn = TypeVar("FuncReturn")
-AlternateReturn = TypeVar("AlternateReturn")
 
 
 class Func(Protocol):
@@ -22,70 +22,57 @@ class Func(Protocol):
         ...
 
 
-class AlternateFunc(Protocol):
-    def __call__(
-        self, *args: FuncArgs, **kwargs: FuncKwArgs
-    ) -> Union[FuncReturn, AlternateReturn]:  # pragma: no cover
-        ...
-
-
-class UnexpectedError(BaseException):
+class UnexpectedError(Exception):
     """This error is raised when something unexpected happens."""
 
     @classmethod
-    def raise_(cls, _, __, ___) -> None:
+    def raise_(cls, _) -> None:
         raise cls("Unexpected error")
 
 
+@contextmanager
 def expect_errors(
     *errors: ExceptionType,
     on_unexpected_error: Callable[
-        [ExceptionType, Sequence[FuncArgs], Dict[str, FuncKwArgs]], AlternateReturn
+        [ExceptionType], FuncReturn
     ] = UnexpectedError.raise_
-) -> AlternateFunc:
+) -> Func:
     """A decorator for handling the unexpected errors.
+
+    Usage: ::
+
+        # As a decorator
+        @errorhelpers.expect_error(*errors, on_unexpected_error=handler)
+        def some_error_prone_funcion():
+            ...
+
+        # Using with statement
+        with errorhelpers.expect_error(*errors, on_unexpected_error=handler):
+            # Some error prone operation
+            ...
+
 
     Example 1: Basic usage
 
         >>> import pytest
         >>> import errorhelpers
         >>>
-        >>> @errorhelpers.expect_errors(ZeroDivisionError)
-        ... def sensitive_transaction(x, y):
-        ...     return int(x) / int(y)
+        >>> with errorhelpers.expect_errors(ZeroDivisionError):
+        ...     assert 4 / 2 == 2
         ...
-        >>> assert sensitive_transaction(4, "2") == 2
-        >>>
         >>> # `ZeroDivisionError` will be re-raised.
         >>> with pytest.raises(ZeroDivisionError):
-        ...     sensitive_transaction(4, 0)
+        ...     with errorhelpers.expect_errors(ZeroDivisionError):
+        ...         4 / 0
         ...
         >>> # In case of other exceptions, `errorhelpers.UnexpectedError("Unexpected error")`
         >>> # will be raised instead.
         >>> with pytest.raises(errorhelpers.UnexpectedError, match="Unexpected error"):
-        ...     sensitive_transaction("a", "b")
+        ...     with errorhelpers.expect_errors(ZeroDivisionError):
+        ...         "a" / "b"
 
-    Example 2: Default value
 
-        >>> import pytest
-        >>> import errorhelpers
-        >>>
-        >>> @errorhelpers.expect_errors(
-        ...     ZeroDivisionError, on_unexpected_error=lambda err_, args_, kwargs_: -1
-        ... )
-        ... def sensitive_transaction(x, y):
-        ...     return int(x) / int(y)
-        ...
-        >>> assert sensitive_transaction(4, "2") == 2
-        >>>
-        >>> # `ZeroDivisionError` will be re-raised.
-        >>> with pytest.raises(ZeroDivisionError):
-        ...     sensitive_transaction(4, 0)
-        ...
-        >>> # In case of other exceptions, -1 will be returned.
-        >>> assert sensitive_transaction("a", "b") == -1
-
-    Example 3: Custom error
+    Example 2: Custom error
 
         >>> import pytest
         >>> import errorhelpers
@@ -93,8 +80,8 @@ def expect_errors(
         >>> class CustomError(Exception):
         ...     @classmethod
         ...     def raise_(cls, msg):
-        ...         def raiser(error, args, kwargs):
-        ...             print("Hiding error:", error, "with args:", args, "and kwargs: ", kwargs)
+        ...         def raiser(error):
+        ...             print("Hiding error:", error)
         ...             raise cls(msg)
         ...
         ...         return raiser
@@ -115,21 +102,12 @@ def expect_errors(
         >>> with pytest.raises(CustomError, match="Custom error"):
         ...     sensitive_transaction("a", "b")
         ...
-        Hiding error: invalid literal for int() with base 10: 'a' with args: ('a', 'b') and kwargs:  {}
+        Hiding error: invalid literal for int() with base 10: 'a'
     """
 
-    def wrapper(func: Func) -> AlternateFunc:
-        @wraps(func)
-        def wrapped(
-            *args: FuncArgs, **kwargs: FuncKwArgs
-        ) -> Union[FuncReturn, AlternateReturn]:
-            try:
-                return func(*args, **kwargs)
-            except errors:
-                raise
-            except Exception as err:
-                return on_unexpected_error(err, args, kwargs)
-
-        return wrapped
-
-    return wrapper
+    try:
+        yield
+    except errors as err:
+        raise err
+    except Exception as err:
+        raise on_unexpected_error(err)

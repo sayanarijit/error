@@ -10,51 +10,45 @@ errorhelpers
 Helpers for handling Python errors.
 
 
+
+
+### Usage:
+
+```python
+# As a decorator
+@errorhelpers.expect_error(*errors, on_unexpected_error=handler)
+def some_error_prone_funcion():
+    ...
+
+# Using with statement
+with errorhelpers.expect_error(*errors, on_unexpected_error=handler):
+    # Some error prone operation
+    ...
+```
+
+
 ### Example 1: Basic usage
 
 ```python
 import pytest
 import errorhelpers
 
-@errorhelpers.expect_errors(ZeroDivisionError)
-def sensitive_transaction(x, y):
-    return int(x) / int(y)
-
-assert sensitive_transaction(4, "2") == 2
+with errorhelpers.expect_errors(ZeroDivisionError):
+    assert 4 / 2 == 2
 
 # `ZeroDivisionError` will be re-raised.
 with pytest.raises(ZeroDivisionError):
-    sensitive_transaction(4, 0)
+    with errorhelpers.expect_errors(ZeroDivisionError):
+        4 / 0
 
 # In case of other exceptions, `errorhelpers.UnexpectedError("Unexpected error")`
 # will be raised instead.
 with pytest.raises(errorhelpers.UnexpectedError, match="Unexpected error"):
-    sensitive_transaction("a", "b")
+    with errorhelpers.expect_errors(ZeroDivisionError):
+        "a" / "b"
 ```
 
-### Example 2: Default value
-
-```python
-import pytest
-import errorhelpers
-
-@errorhelpers.expect_errors(
-    ZeroDivisionError, on_unexpected_error=lambda err_, args_, kwargs_: -1
-)
-def sensitive_transaction(x, y):
-    return int(x) / int(y)
-
-assert sensitive_transaction(4, "2") == 2
-
-# `ZeroDivisionError` will be re-raised.
-with pytest.raises(ZeroDivisionError):
-    sensitive_transaction(4, 0)
-
-# In case of other exceptions, -1 will be returned.
-assert sensitive_transaction("a", "b") == -1
-```
-
-### Example 3: Custom error
+### Example 2: Custom error
 
 ```python
 import pytest
@@ -63,8 +57,8 @@ import errorhelpers
 class CustomError(Exception):
     @classmethod
     def raise_(cls, msg):
-        def raiser(error, args, kwargs):
-            print("Hiding error:", error, "with args:", args, "and kwargs: ", kwargs)
+        def raiser(error):
+            print("Hiding error:", error)
             raise cls(msg)
 
         return raiser
@@ -85,5 +79,5 @@ with pytest.raises(ZeroDivisionError):
 with pytest.raises(CustomError, match="Custom error"):
     sensitive_transaction("a", "b")
 
-# Hiding error: invalid literal for int() with base 10: 'a' with args: ('a', 'b') and kwargs:  {}
+# Hiding error: invalid literal for int() with base 10: 'a'
 ```
